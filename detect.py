@@ -6,6 +6,7 @@ from pathlib import Path
 
 import cv2
 import mediapipe as mp
+import numpy as np
 
 MODEL_DIR = Path(__file__).resolve().parent / "models"
 HAND_MODEL = MODEL_DIR / "hand_landmarker.task"
