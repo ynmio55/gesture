@@ -123,7 +123,7 @@ def load_web_memes():
 
 def choose_reaction(hand_labels, pose_landmarks):
     """Choose a reaction category from the combined hand + body pose."""
-    left_up = right_up = false = False
+    left_up = right_up = False
     both_near_head = False
     if pose_landmarks:
         lm = pose_landmarks[0]
