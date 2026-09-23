@@ -17,7 +17,7 @@ POSE_MODEL = MODEL_DIR / "pose_landmarker_lite.task"
 HAND_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
 POSE_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
 
-REACTIONS = {
+REACTIONS = {\n    "WAVE": ("WAVE", (50, 190, 70)),\n    "BOTH HANDS UP": ("HANDS UP", (30, 160, 240)),\n    "SHOCKED": ("SHOCKED", (40, 40, 220)),
     "OPEN PALM": ("STOP!", (40, 40, 220)),
     "FIST": ("FIST!", (180, 70, 30)),
     "POINT": ("POINT!", (30, 160, 240)),
@@ -76,7 +76,7 @@ def draw_chain(frame, lm, connections, color):
         cv2.circle(frame, (x, y), 3, (255, 255, 255), -1, cv2.LINE_AA)
 
 
-MEME_URLS = {
+MEME_URLS = {\n    "WAVE": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Waving_hand.jpg",\n    "BOTH HANDS UP": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Surprised%20Person.png",\n    "SHOCKED": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Openmouth.jpg",
     "OPEN PALM": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Baby%20surprised%20face.jpg",
     "FIST": "https://commons.wikimedia.org/wiki/Special:Redirect/file/SketchOfAConfusedHuman.jpg",
     "POINT": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Surprised%20Person.png",
@@ -119,6 +119,42 @@ def load_web_memes():
             print(f"Warning: could not download {label}: {exc}")
     print(f"Loaded {len(result)}/{len(MEME_URLS)} reaction images")
     return result
+
+
+def choose_reaction(hand_labels, pose_landmarks):
+    """Choose a reaction category from the combined hand + body pose."""
+    left_up = right_up = false = False
+    both_near_head = False
+    if pose_landmarks:
+        lm = pose_landmarks[0]
+        left_up = lm[15].visibility > .6 and lm[15].y < lm[11].y
+        right_up = lm[16].visibility > .6 and lm[16].y < lm[12].y
+        # wrists close to ears/head: classic shocked / hands-on-head pose
+        both_near_head = (
+            lm[15].visibility > .6 and lm[16].visibility > .6 and
+            abs(lm[15].x - lm[7].x) < .18 and abs(lm[15].y - lm[7].y) < .22 and
+            abs(lm[16].x - lm[8].x) < .18 and abs(lm[16].y - lm[8].y) < .22
+        )
+
+    if both_near_head:
+        return "SHOCKED"
+    if left_up and right_up:
+        return "BOTH HANDS UP"
+    if "PEACE" in hand_labels:
+        return "PEACE"
+    if "POINT" in hand_labels:
+        return "POINT"
+    if "FIST" in hand_labels:
+        return "FIST"
+    if "OPEN PALM" in hand_labels and (left_up or right_up):
+        return "WAVE"
+    if "OPEN PALM" in hand_labels:
+        return "OPEN PALM"
+    if left_up:
+        return "LEFT HAND UP"
+    if right_up:
+        return "RIGHT HAND UP"
+    return "READY"
 
 
 def make_reaction_panel(label, height, meme_images=None, width=None):
@@ -200,11 +236,11 @@ def main():
 
             hr = hands.detect_for_video(image, timestamp_ms)
             pr = pose.detect_for_video(image, timestamp_ms)
-            labels = []
+            labels = []\n            hand_labels = []
 
             for lm in hr.hand_landmarks:
                 draw_chain(frame, lm, hand_connections, (0, 255, 80))
-                labels.append(classify_hand(lm))
+                hand_label = classify_hand(lm)\n                hand_labels.append(hand_label)\n                labels.append(hand_label)
 
             for lm in pr.pose_landmarks:
                 draw_chain(frame, lm, pose_connections, (255, 180, 0))
@@ -226,7 +262,7 @@ def main():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 120), 2)
 
             # Keep a stable reaction briefly instead of flickering when landmarks disappear.
-            active = next((x for x in labels if x in REACTIONS), "READY")
+            active = choose_reaction(hand_labels, pr.pose_landmarks)
             reaction = make_reaction_panel(
                 active, frame.shape[0], meme_images,
                 width=max(420, frame.shape[1] // 2)
