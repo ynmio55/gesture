@@ -17,7 +17,10 @@ POSE_MODEL = MODEL_DIR / "pose_landmarker_lite.task"
 HAND_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
 POSE_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
 
-REACTIONS = {\n    "WAVE": ("WAVE", (50, 190, 70)),\n    "BOTH HANDS UP": ("HANDS UP", (30, 160, 240)),\n    "SHOCKED": ("SHOCKED", (40, 40, 220)),
+REACTIONS = {
+    "WAVE": ("WAVE", (50, 190, 70)),
+    "BOTH HANDS UP": ("HANDS UP", (30, 160, 240)),
+    "SHOCKED": ("SHOCKED", (40, 40, 220)),
     "OPEN PALM": ("STOP!", (40, 40, 220)),
     "FIST": ("FIST!", (180, 70, 30)),
     "POINT": ("POINT!", (30, 160, 240)),
@@ -76,7 +79,9 @@ def draw_chain(frame, lm, connections, color):
         cv2.circle(frame, (x, y), 3, (255, 255, 255), -1, cv2.LINE_AA)
 
 
-MEME_URLS = {\n    "WAVE": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Waving_hand.jpg",\n    "BOTH HANDS UP": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Surprised%20Person.png",\n    "SHOCKED": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Openmouth.jpg",
+MEME_URLS = {\n    "WAVE": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Waving_hand.jpg",
+    "BOTH HANDS UP": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Surprised%20Person.png",
+    "SHOCKED": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Openmouth.jpg",
     "OPEN PALM": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Baby%20surprised%20face.jpg",
     "FIST": "https://commons.wikimedia.org/wiki/Special:Redirect/file/SketchOfAConfusedHuman.jpg",
     "POINT": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Surprised%20Person.png",
