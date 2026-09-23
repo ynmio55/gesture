@@ -74,33 +74,55 @@ def draw_chain(frame, lm, connections, color):
         cv2.circle(frame, (x, y), 3, (255, 255, 255), -1, cv2.LINE_AA)
 
 
-def make_reaction_panel(label, height, width=420):
-    """Built-in meme/reaction panel so the feature works without external image files."""
+def load_web_meme():
+    """Download/cache a real internet reaction image (CC BY 3.0, Wikimedia Commons)."""
+    meme_dir = Path(__file__).resolve().parent / "assets" / "memes"
+    meme_dir.mkdir(parents=True, exist_ok=True)
+    path = meme_dir / "surprised_face.jpg"
+    if not path.exists():
+        url = "https://commons.wikimedia.org/wiki/Special:Redirect/file/Surprised%20Face.jpg"
+        print("Downloading internet reaction image ...")
+        try:
+            urllib.request.urlretrieve(url, path)
+        except Exception as exc:
+            print(f"Could not download meme: {exc}")
+            return None
+    return cv2.imread(str(path))
+
+
+def make_reaction_panel(label, height, meme_image=None, width=420):
     panel = np.zeros((height, width, 3), dtype=np.uint8)
     title, color = REACTIONS.get(label, ("READY", (70, 70, 70)))
-    panel[:] = tuple(max(0, int(c * 0.20)) for c in color)
-    cv2.putText(panel, "REACTION", (32, 65), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (230,230,230), 2)
-    # Simple expressive face / meme card.
-    cx, cy = width // 2, height // 2 - 20
-    cv2.circle(panel, (cx, cy), 125, color, -1, cv2.LINE_AA)
-    cv2.circle(panel, (cx-45, cy-30), 18, (255,255,255), -1, cv2.LINE_AA)
-    cv2.circle(panel, (cx+45, cy-30), 18, (255,255,255), -1, cv2.LINE_AA)
-    cv2.circle(panel, (cx-45, cy-30), 8, (10,10,10), -1, cv2.LINE_AA)
-    cv2.circle(panel, (cx+45, cy-30), 8, (10,10,10), -1, cv2.LINE_AA)
-    if label == "FIST":
-        cv2.line(panel, (cx-50,cy+55),(cx+50,cy+55),(20,20,20),8,cv2.LINE_AA)
+    panel[:] = (18, 18, 18)
+
+    if label != "READY" and meme_image is not None:
+        img = meme_image.copy()
+        ih, iw = img.shape[:2]
+        max_h = max(120, height - 150)
+        scale = min(width / iw, max_h / ih)
+        nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+        img = cv2.resize(img, (nw, nh), interpolation=cv2.INTER_AREA)
+        x = (width - nw) // 2
+        y = max(0, (height - 100 - nh) // 2)
+        panel[y:y+nh, x:x+nw] = img
     else:
-        cv2.ellipse(panel, (cx,cy+45),(55,38),0,0,180,(20,20,20),8,cv2.LINE_AA)
-    scale = 1.25 if len(title) < 10 else .9
+        cv2.putText(panel, "SHOW A GESTURE", (35, height // 2),
+                    cv2.FONT_HERSHEY_DUPLEX, .85, (220,220,220), 2, cv2.LINE_AA)
+
+    cv2.rectangle(panel, (0, height-100), (width, height), color, -1)
+    scale = 1.15 if len(title) < 10 else .82
     tw = cv2.getTextSize(title, cv2.FONT_HERSHEY_DUPLEX, scale, 3)[0][0]
-    cv2.putText(panel, title, ((width-tw)//2, height-75), cv2.FONT_HERSHEY_DUPLEX, scale, (255,255,255), 3, cv2.LINE_AA)
-    cv2.putText(panel, "Show a gesture to change reaction", (28,height-30), cv2.FONT_HERSHEY_SIMPLEX,.48,(190,190,190),1,cv2.LINE_AA)
+    cv2.putText(panel, title, ((width-tw)//2, height-42),
+                cv2.FONT_HERSHEY_DUPLEX, scale, (255,255,255), 3, cv2.LINE_AA)
+    cv2.putText(panel, "Image: Wikimedia Commons / CC BY 3.0", (20,height-14),
+                cv2.FONT_HERSHEY_SIMPLEX,.38,(245,245,245),1,cv2.LINE_AA)
     return panel
 
 
 def main():
     ensure_model(HAND_MODEL, HAND_URL)
     ensure_model(POSE_MODEL, POSE_URL)
+    meme_image = load_web_meme()
 
     hand_opts = vision.HandLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=str(HAND_MODEL)),
@@ -172,7 +194,7 @@ def main():
 
             # Keep a stable reaction briefly instead of flickering when landmarks disappear.
             active = next((x for x in labels if x in REACTIONS), "READY")
-            reaction = make_reaction_panel(active, frame.shape[0])
+            reaction = make_reaction_panel(active, frame.shape[0], meme_image)
             combined = np.hstack((frame, reaction))
             cv2.imshow("Gesture Reaction Camera", combined)
             if cv2.waitKey(1) & 0xFF in (27, ord("q")):
