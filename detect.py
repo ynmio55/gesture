@@ -1,7 +1,9 @@
 from __future__ import annotations
 import math
+import random
 import time
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 import cv2
@@ -96,8 +98,18 @@ def load_web_memes():
             if not path.exists() or path.stat().st_size < 2000:
                 print(f"Downloading reaction: {label} ...")
                 req = urllib.request.Request(url, headers={"User-Agent": "gesture-reaction-camera/1.0"})
-                with urllib.request.urlopen(req, timeout=15) as response, open(path, "wb") as out:
-                    out.write(response.read())
+                for attempt in range(3):
+                    try:
+                        with urllib.request.urlopen(req, timeout=20) as response, open(path, "wb") as out:
+                            out.write(response.read())
+                        break
+                    except urllib.error.HTTPError as http_exc:
+                        if http_exc.code != 429 or attempt == 2:
+                            raise
+                        wait = 2.0 + attempt * 3.0 + random.random()
+                        print(f"Rate limited; retrying {label} in {wait:.1f}s ...")
+                        time.sleep(wait)
+                time.sleep(1.2 + random.random() * 0.8)
             img = cv2.imread(str(path))
             if img is not None:
                 result[label] = img
@@ -114,8 +126,8 @@ def make_reaction_panel(label, height, meme_images=None, width=420):
     title, color = REACTIONS.get(label, ("READY", (70, 70, 70)))
     panel[:] = (18, 18, 18)
 
-    if label != "READY" and meme_image is not None:
-        img = meme_image.copy()
+    if label != "READY" and meme_images and label in meme_images:
+        img = meme_images[label].copy()
         ih, iw = img.shape[:2]
         max_h = max(120, height - 150)
         scale = min(width / iw, max_h / ih)
