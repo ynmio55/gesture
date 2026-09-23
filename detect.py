@@ -74,23 +74,42 @@ def draw_chain(frame, lm, connections, color):
         cv2.circle(frame, (x, y), 3, (255, 255, 255), -1, cv2.LINE_AA)
 
 
-def load_web_meme():
-    """Download/cache a real internet reaction image (CC BY 3.0, Wikimedia Commons)."""
+MEME_URLS = {
+    "OPEN PALM": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Baby%20surprised%20face.jpg",
+    "FIST": "https://commons.wikimedia.org/wiki/Special:Redirect/file/SketchOfAConfusedHuman.jpg",
+    "POINT": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Surprised%20Person.png",
+    "PEACE": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Surprising%20face%20of%20manga%202022-08-30.png",
+    "LEFT HAND UP": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Openmouth.jpg",
+    "RIGHT HAND UP": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Openmouth.jpg",
+}
+
+
+def load_web_memes():
+    """Download/cache real reaction images. A failed image never disables the others."""
     meme_dir = Path(__file__).resolve().parent / "assets" / "memes"
     meme_dir.mkdir(parents=True, exist_ok=True)
-    path = meme_dir / "surprised_face.jpg"
-    if not path.exists():
-        url = "https://commons.wikimedia.org/wiki/Special:Redirect/file/Surprised%20Face.jpg"
-        print("Downloading internet reaction image ...")
+    result = {}
+    for label, url in MEME_URLS.items():
+        ext = ".png" if url.lower().endswith(".png") else ".jpg"
+        path = meme_dir / (label.lower().replace(" ", "_") + ext)
         try:
-            urllib.request.urlretrieve(url, path)
+            if not path.exists() or path.stat().st_size < 2000:
+                print(f"Downloading reaction: {label} ...")
+                req = urllib.request.Request(url, headers={"User-Agent": "gesture-reaction-camera/1.0"})
+                with urllib.request.urlopen(req, timeout=15) as response, open(path, "wb") as out:
+                    out.write(response.read())
+            img = cv2.imread(str(path))
+            if img is not None:
+                result[label] = img
+            else:
+                print(f"Warning: invalid image for {label}: {path}")
         except Exception as exc:
-            print(f"Could not download meme: {exc}")
-            return None
-    return cv2.imread(str(path))
+            print(f"Warning: could not download {label}: {exc}")
+    print(f"Loaded {len(result)}/{len(MEME_URLS)} reaction images")
+    return result
 
 
-def make_reaction_panel(label, height, meme_image=None, width=420):
+def make_reaction_panel(label, height, meme_images=None, width=420):
     panel = np.zeros((height, width, 3), dtype=np.uint8)
     title, color = REACTIONS.get(label, ("READY", (70, 70, 70)))
     panel[:] = (18, 18, 18)
@@ -122,7 +141,7 @@ def make_reaction_panel(label, height, meme_image=None, width=420):
 def main():
     ensure_model(HAND_MODEL, HAND_URL)
     ensure_model(POSE_MODEL, POSE_URL)
-    meme_image = load_web_meme()
+    meme_images = load_web_memes()
 
     hand_opts = vision.HandLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=str(HAND_MODEL)),
@@ -194,7 +213,7 @@ def main():
 
             # Keep a stable reaction briefly instead of flickering when landmarks disappear.
             active = next((x for x in labels if x in REACTIONS), "READY")
-            reaction = make_reaction_panel(active, frame.shape[0], meme_image)
+            reaction = make_reaction_panel(active, frame.shape[0], meme_images)
             combined = np.hstack((frame, reaction))
             cv2.imshow("Gesture Reaction Camera", combined)
             if cv2.waitKey(1) & 0xFF in (27, ord("q")):
