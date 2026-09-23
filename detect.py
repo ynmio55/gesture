@@ -121,32 +121,34 @@ def load_web_memes():
     return result
 
 
-def make_reaction_panel(label, height, meme_images=None, width=420):
-    panel = np.zeros((height, width, 3), dtype=np.uint8)
-    title, color = REACTIONS.get(label, ("READY", (70, 70, 70)))
-    panel[:] = (18, 18, 18)
+def make_reaction_panel(label, height, meme_images=None, width=None):
+    """Reference-style right pane: a large real meme image, no synthetic card UI."""
+    width = width or int(height * 0.90)
+    panel = np.full((height, width, 3), 245, dtype=np.uint8)
 
-    if label != "READY" and meme_images and label in meme_images:
-        img = meme_images[label].copy()
-        ih, iw = img.shape[:2]
-        max_h = max(120, height - 150)
-        scale = min(width / iw, max_h / ih)
-        nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
-        img = cv2.resize(img, (nw, nh), interpolation=cv2.INTER_AREA)
-        x = (width - nw) // 2
-        y = max(0, (height - 100 - nh) // 2)
-        panel[y:y+nh, x:x+nw] = img
-    else:
-        cv2.putText(panel, "SHOW A GESTURE", (35, height // 2),
-                    cv2.FONT_HERSHEY_DUPLEX, .85, (220,220,220), 2, cv2.LINE_AA)
+    if label == "READY":
+        cv2.putText(panel, "Show a gesture", (35, height // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (80,80,80), 2, cv2.LINE_AA)
+        return panel
 
-    cv2.rectangle(panel, (0, height-100), (width, height), color, -1)
-    scale = 1.15 if len(title) < 10 else .82
-    tw = cv2.getTextSize(title, cv2.FONT_HERSHEY_DUPLEX, scale, 3)[0][0]
-    cv2.putText(panel, title, ((width-tw)//2, height-42),
-                cv2.FONT_HERSHEY_DUPLEX, scale, (255,255,255), 3, cv2.LINE_AA)
-    cv2.putText(panel, "Image: Wikimedia Commons / CC BY 3.0", (20,height-14),
-                cv2.FONT_HERSHEY_SIMPLEX,.38,(245,245,245),1,cv2.LINE_AA)
+    img = None
+    if meme_images:
+        img = meme_images.get(label)
+        if img is None and meme_images:
+            # Never leave the right side blank merely because one URL was rate-limited.
+            img = next(iter(meme_images.values()))
+
+    if img is None:
+        cv2.putText(panel, label, (35, height // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (50,50,50), 2, cv2.LINE_AA)
+        return panel
+
+    ih, iw = img.shape[:2]
+    scale = min(width / max(iw, 1), height / max(ih, 1))
+    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+    img = cv2.resize(img, (nw, nh), interpolation=cv2.INTER_AREA)
+    x, y = (width - nw) // 2, (height - nh) // 2
+    panel[y:y+nh, x:x+nw] = img
     return panel
 
 
@@ -225,7 +227,10 @@ def main():
 
             # Keep a stable reaction briefly instead of flickering when landmarks disappear.
             active = next((x for x in labels if x in REACTIONS), "READY")
-            reaction = make_reaction_panel(active, frame.shape[0], meme_images)
+            reaction = make_reaction_panel(
+                active, frame.shape[0], meme_images,
+                width=max(420, frame.shape[1] // 2)
+            )
             combined = np.hstack((frame, reaction))
             cv2.imshow("Gesture Reaction Camera", combined)
             if cv2.waitKey(1) & 0xFF in (27, ord("q")):
