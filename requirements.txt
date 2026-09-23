@@ -1,3 +1,5 @@
-opencv-python>=4.8
-mediapipe>=0.10
-numpy>=1.24
+# MediaPipe 1.x changed the Python API and removed mp.solutions from the root.
+# Keep the project on the stable Solutions-compatible release for this app.
+mediapipe==0.10.21
+opencv-contrib-python>=4.8,<5
+numpy>=1.24,<2
